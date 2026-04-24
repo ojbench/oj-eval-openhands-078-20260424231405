@@ -42,6 +42,13 @@ class ACMOJClient:
         }
 
         self.submission_log_file = '/workspace/submission_ids.log'
+
+    def submit_code(self, problem_id: int, language: str, code: str) -> Optional[Dict]:
+        data = {"language": language, "code": code}
+        result = self._make_request("POST", f"/problem/{problem_id}/submit", data=data)
+        if result and 'id' in result:
+            self._save_submission_id(result['id'])
+        return result
         
 
     def _make_request(self, method: str, endpoint: str, data: Dict[str, Any] = None, 
@@ -114,6 +121,12 @@ def main():
     submit_parser.add_argument("--problem-id", type=int, required=True, help="Problem ID")
     submit_parser.add_argument("--git-url", type=str, required=True, help="Git repository URL")
 
+    # Code submission sub-command (direct code string)
+    submit_code_parser = subparsers.add_parser("submit_code", help="Submit code directly (e.g., header for harness)")
+    submit_code_parser.add_argument("--problem-id", type=int, required=True, help="Problem ID")
+    submit_code_parser.add_argument("--language", type=str, required=True, help="Language, e.g., cpp")
+    submit_code_parser.add_argument("--code-file", type=str, required=True, help="Path to code file to upload as submission body")
+
     # Sub-command for checking submission status
     status_parser = subparsers.add_parser("status", help="Check submission status")
     status_parser.add_argument("--submission-id", type=int, required=True, help="Submission ID")
@@ -132,6 +145,14 @@ def main():
 
     if args.command == "submit":
         result = client.submit_git(args.problem_id, args.git_url)
+    elif args.command == "submit_code":
+        try:
+            with open(args.code_file, 'r', encoding='utf-8') as f:
+                code_content = f.read()
+        except Exception as e:
+            print(f"Failed to read code file: {e}")
+            return
+        result = client.submit_code(args.problem_id, args.language, code_content)
     elif args.command == "status":
         result = client.get_submission_detail(args.submission_id)
     elif args.command == "abort":
